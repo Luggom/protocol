@@ -1,0 +1,65 @@
+# Endpoints públicos da testnet — Luggom
+
+> **RESET 2026-11-19:** depois do reset a chain-id é `luggom-test01` com 16
+> validadores. Ver [RESET-2026-11-19.md](RESET-2026-11-19.md). Até lá, a chain
+> live é `luggom-test`.
+
+**chain-id:** `luggom-test01` (a partir de 2026-11-19; `luggom-test` antes)
+**Estado:** testnet pública. Pode ser resetada (saldos e histórico podem desaparecer). Nada aqui tem valor monetário.
+
+## Endpoints
+
+| Serviço | URL | Para que serve |
+|---|---|---|
+| RPC (CometBFT) | `https://rpc.luggom.com` | status, blocos, pesquisa de transações |
+| LCD / REST | `https://lcd.luggom.com` | consultas Cosmos, saldos, broadcast |
+| API | `https://api.luggom.com` | mineração, whitelist de bancos, tokenomics |
+| Notário TLSNotary | `https://notary.luggom.com` | sessões de prova; WebSocket em `wss://notary.luggom.com/session` |
+
+IP direto (fallback): `62.146.183.122` nas portas `26657` (RPC), `1317` (LCD), `8082` (API) e `7047` (notário).
+
+O p2p (`26656`) está aberto no seed público para validadores:
+`1530baa7b3a07e0cab8dc81c9c08fccc51a47471@62.146.183.122:26656`. Não expor
+RPC/LCD/API ao público. Validadores entram por convite.
+
+## Verificação rápida
+
+```sh
+curl https://rpc.luggom.com/status
+curl https://lcd.luggom.com/cosmos/base/tendermint/v1beta1/blocks/latest
+curl https://lcd.luggom.com/cosmos/base/tendermint/v1beta1/validatorsets/latest
+curl https://api.luggom.com/api/v1/chain/info
+curl https://notary.luggom.com/health
+```
+
+Respostas esperadas depois do reset: `chain_id = luggom-test01`, altura a subir, **13 validadores** (NODESYNC, Sr20de e BonyNode podem entrar depois), `ok` no notário.
+
+## Primeira mineração (on-chain) — histórica, `luggom-test`
+
+Esta transação é da chain antiga e não existe na `luggom-test01`.
+
+- tx: `75EEF27E00190D2117E2DBA4388B694C34962467F56F77A57CC4114A61E5141D`
+- altura: `1284`
+- resultado: `code 0`
+- R$ 1.291,49 → 21,09167035214527237 LUG
+
+Consulta direta:
+
+```sh
+curl https://lcd.luggom.com/cosmos/tx/v1beta1/txs/75EEF27E00190D2117E2DBA4388B694C34962467F56F77A57CC4114A61E5141D
+```
+
+## Configurar a aplicação desktop
+
+| Campo | Valor |
+|---|---|
+| Network → Node (LCD) | `https://lcd.luggom.com` |
+| Minerar → API | `https://api.luggom.com` |
+| Minerar → Notário | `https://notary.luggom.com` |
+
+## Limites e avisos
+
+- A API limita pedidos de mineração a **5 por hora por IP**.
+- Um operador, quatro validadores no mesmo servidor: **sem SLA de uptime**.
+- Não uses estes endpoints como backend de produção.
+- A chave do notário **não** é pública; só o endpoint é.

@@ -1,0 +1,274 @@
+package keeper
+
+import (
+	"context"
+	"fmt"
+	"strings"
+	"time"
+
+	sdkmath "cosmossdk.io/math"
+	sdk "github.com/cosmos/cosmos-sdk/types"
+
+	"luggom/x/luggom/types"
+)
+
+// MineTaxPayment processes a TLSNotary tax-payment mining request (Fase B).
+// Unified global flow: EUA + Brasil via Reclaim Protocol proof.
+func (k Keeper) MineTaxPayment(ctx context.Context, msg *types.MsgMineTaxPayment) (*types.MsgMineTaxPaymentResponse, error) {
+	params, err := k.Params.Get(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get params: %w", err)
+	}
+
+	// 1. Validate tax_entity against global whitelist
+	taxEntity := strings.TrimSpace(msg.TaxEntity)
+	if taxEntity == "" {
+		return nil, types.ErrInvalidTaxEntity.Wrap("tax_entity is empty")
+	}
+	whitelisted, err := k.IsTaxEntityWhitelisted(ctx, taxEntity)
+	if err != nil {
+		return nil, fmt.Errorf("whitelist check: %w", err)
+	}
+	if !whitelisted {
+		return nil, types.ErrInvalidTaxEntity.Wrap(taxEntity)
+	}
+
+	// 1c. O BANCO tem de estar na whitelist ON-CHAIN (§13.131, achado A4).
+	// Antes, só a API o verificava — e a API pode ser contornada (um cliente a
+	// falar directamente com a chain, ou uma API comprometida). O provider_id vai
+	// no digest assinado pelo notário, logo não pode ser trocado depois.
+	// Fail-closed: id vazio ou fora da lista ⇒ rejeita.
+	providerID := strings.TrimSpace(msg.ProviderId)
+	if !types.IsBankProviderWhitelisted(providerID, params.BankProviders) {
+		return nil, types.ErrBankProviderNotWhitelisted.Wrapf("%q", providerID)
+	}
+
+	// 1b. Block government-to-government mining (anti-inflation / anti-sybil, FASE 4-A..F)
+	// Two layers:
+	//   (1) payer_tax_id matches the on-chain government blacklist (params, gov-67% editable)
+	//   (2) fallback: payer_tax_id matches ANY tax entity in the whitelist (slug→ID map) —
+	//       covers every municipality/county/province in the whitelist without listing them all.
+	//
+	// Privacidade: `payer_tax_id` traz o SHA-256 do ID normalizado, nunca o CNPJ/EIN
+	// em claro. As duas camadas passam a comparar hashes — incluindo os hashes dos
+	// substrings ≥6 caracteres, o que preserva o match de recibos que mascaram
+	// parte do número. Um valor que não seja 64 hex é recusado (fail-closed): a
+	// chain não aceita o ID cru de um cliente modificado.
+	payerTaxIDHash := strings.TrimSpace(msg.PayerTaxId)
+	if payerTaxIDHash != "" {
+		if !types.IsHash64(payerTaxIDHash) {
+			return nil, types.ErrInvalidAttestation.Wrap(
+				"payer_tax_id must be a SHA-256 hex — the raw EIN/CNPJ/BN is never stored on-chain")
+		}
+		// Layer 1: blacklist params (governable list)
+		if types.IsGovernmentEntityHash(payerTaxIDHash, params.GovernmentEntityBlacklist) {
+			return nil, types.ErrGovernmentEntityCannotMine.Wrapf(
+				"payer %s is a government entity — government-to-government transfers cannot mine LUG",
+				payerTaxIDHash,
+			)
+		}
+		// Layer 2: fallback — payer ID belongs to a whitelisted tax entity (government)
+		if types.IsHashOfWhitelistedEntity(payerTaxIDHash) {
+			return nil, types.ErrGovernmentEntityCannotMine.Wrapf(
+				"payer %s is a government entity (tax whitelist) — government-to-government transfers cannot mine LUG",
+				payerTaxIDHash,
+			)
+		}
+	}
+
+	// 2. Validate currency_code (BCA: USD, BRL, CAD)
+	cc := strings.ToUpper(strings.TrimSpace(msg.CurrencyCode))
+	if cc == "" {
+		cc = "USD"
+	}
+	if cc != "USD" && cc != "BRL" && cc != "CAD" {
+		return nil, types.ErrInvalidCurrencyCode.Wrap(cc)
+	}
+
+	// 3. Validate proof_commitment (anti-double-spend)
+	pc := strings.TrimSpace(msg.ProofCommitment)
+	if len(pc) < 32 {
+		return nil, fmt.Errorf("proof_commitment too short (min 32 chars)")
+	}
+	alreadyUsed, err := k.UsedDocumentHashes.Has(ctx, pc)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check proof_commitment: %w", err)
+	}
+	if alreadyUsed {
+		return nil, types.ErrProofAlreadyUsed
+	}
+
+	// 4. Validate payment_id (anti-replay). O valor é o SHA-256 do identificador
+	//    de liquidação (E2E do PIX / id do comprovante): o valor cru nunca vai
+	//    para a chain. Recusar não-hashes impede que um cliente modificado
+	//    publique o E2E ao contornar o extrator.
+	pid := strings.TrimSpace(msg.PaymentId)
+	if !types.IsHash64(pid) {
+		return nil, fmt.Errorf("payment_id must be a SHA-256 hex (64 chars), got %d", len(pid))
+	}
+	pidUsed, err := k.UsedPaymentIDs.Has(ctx, pid)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check payment_id: %w", err)
+	}
+	if pidUsed {
+		return nil, types.ErrPaymentIDAlreadyUsed
+	}
+
+	// 5. Check staleness — and reject future dates explicitly. A payment date a
+	//    few days ahead would otherwise resolve to a past fixing (the lookback
+	//    goes backwards) instead of failing closed, letting the prover pick a
+	//    price that has not happened yet.
+	//
+	//    A janela é comparada em DIAS UTC, não em instantes: a data do pagamento é
+	//    uma data civil (00:00 UTC) e comparar instantes tornava os "365 dias" em
+	//    364 na prática, contradizendo a constante e a mensagem de erro.
+	blockTime := sdk.UnwrapSDKContext(ctx).BlockTime()
+	if msg.PaymentDate <= 0 {
+		return nil, fmt.Errorf("payment_date is required")
+	}
+	maxAge := types.TaxPaymentMaxAgeDaysFrozen
+	if maxAge == 0 {
+		maxAge = 365
+	}
+	paymentTime := time.Unix(msg.PaymentDate, 0).UTC()
+	if paymentTime.After(blockTime) {
+		return nil, types.ErrFuturePayment.Wrapf("payment date %s is after block time %s",
+			paymentTime.Format("2006-01-02"), blockTime.UTC().Format(time.RFC3339))
+	}
+	cutoff := blockTime.UTC().Truncate(24*time.Hour).AddDate(0, 0, -int(maxAge))
+	if paymentTime.Before(cutoff) {
+		return nil, types.ErrStalePayment.Wrapf("payment date %s exceeds max age %d days",
+			paymentTime.Format("2006-01-02"), maxAge)
+	}
+
+	// 5b. Validate tax_nature_hash (anti-cycle, §13.34): the API extractor must
+	// have proven the payment is a real tax collection (DARF/IPTU/IPVA, property
+	// tax, CRA BN+RT). A common PIX/transfer to a whitelisted CNPJ/EIN is rejected.
+	//
+	// O tax_nature_hash NÃO é anti-replay: ele representa a NATUREZA FISCAL do
+	// comprovante (igual para muitos comprovantes do mesmo tipo, ex: todo PIX
+	// IPTU tem o mesmo fragmento). O anti-replay real é proof_commitment +
+	// payment_id (passos 3 e 4 acima). Registar o tax_nature_hash em
+	// UsedDocumentHashes faria a 2ª mineração do MESMO tipo de imposto ser
+	// rejeitada como double-spend — falso positivo.
+	taxNatureHash := strings.TrimSpace(msg.TaxNatureHash)
+	if len(taxNatureHash) < 32 {
+		return nil, types.ErrMissingTaxNature.Wrap("tax_nature_hash too short (min 32 chars)")
+	}
+
+	// 6. Verify API attestation (Fase 1: trust API, validate minimum length)
+	if err := k.VerifyApiAttestation(ctx, msg); err != nil {
+		return nil, err
+	}
+
+	// 7. Validate payment_amount
+	if msg.PaymentAmount.IsNil() || msg.PaymentAmount.LTE(sdkmath.LegacyZeroDec()) {
+		return nil, fmt.Errorf("payment_amount must be positive")
+	}
+
+	// 8. Preço NA DATA DO PAGAMENTO: um recibo não pode ser uma opção gratuita
+	//    sobre a cesta (365 dias de janela) nem sobre o salto anual do
+	//    multiplicador. Usa-se a fixing em vigor no início do dia do pagamento
+	//    (convenção PTAX). Sem fixing na janela → fail-closed.
+	daySnap, err := k.UsdOracleSnapshotForPaymentDay(ctx, msg.PaymentDate)
+	if err != nil {
+		return nil, err
+	}
+
+	// 8a. Convert BRL/CAD → USD com a taxa da fixing em vigor. Sem taxa no
+	//     snapshot, a mineração PÁRA: as constantes 5,0/1,37 foram removidas
+	//     (o desvio ao mercado sobre/sub-cunhava, §13.174).
+	amountUSD := msg.PaymentAmount
+	if cc == "BRL" {
+		if daySnap.BrlUsd.IsNil() || !daySnap.BrlUsd.IsPositive() {
+			return nil, fmt.Errorf("no BRL/USD rate for the fixing in force on %s: mining is PAUSED",
+				paymentTime.Format("2006-01-02"))
+		}
+		amountUSD = msg.PaymentAmount.Quo(daySnap.BrlUsd)
+	} else if cc == "CAD" {
+		if daySnap.CadUsd.IsNil() || !daySnap.CadUsd.IsPositive() {
+			return nil, fmt.Errorf("no CAD/USD rate for the fixing in force on %s: mining is PAUSED",
+				paymentTime.Format("2006-01-02"))
+		}
+		amountUSD = msg.PaymentAmount.Quo(daySnap.CadUsd)
+	}
+
+	// 9. Resolve USD/LUG parity with the basket and multiplier of the PAYMENT
+	//    date (not the mining date).
+	usdParity, err := k.usdParityFromBasketRatesAt(ctx,
+		time.Unix(msg.PaymentDate, 0).UTC(),
+		daySnap.ChfUsd, daySnap.EurUsd, daySnap.GbpUsd)
+	if err != nil {
+		return nil, err
+	}
+
+	// 10. Calculate LUG amount
+	amountLUG := amountUSD.Quo(usdParity)
+	amountLUGInt := amountLUG.MulInt64(1_000_000_000_000_000_000).TruncateInt()
+	if amountLUGInt.IsZero() {
+		return nil, fmt.Errorf("calculated LUG amount is zero (payment_amount too small)")
+	}
+
+	// 10b. Annual mining cap (MVP 2.0 §13.49/§13.52): 365d sliding window, 7B −5% a.a.
+	if err := k.recordMinedAmount(ctx, amountLUGInt); err != nil {
+		return nil, err
+	}
+
+	// Split único e permanente da mineração.
+	split := computeMiningSplit(amountLUGInt)
+
+	// 12. Resolve miner address
+	minerAddr, err := k.addressCodec.StringToBytes(msg.MinerAddress)
+	if err != nil {
+		return nil, fmt.Errorf("invalid miner_address: %w", err)
+	}
+
+	// 13. Mint + distribuir o split (o envio ao cofre OTC é fail-closed).
+	if err := k.distributeMiningSplit(ctx, params, split, minerAddr); err != nil {
+		return nil, err
+	}
+
+	// 14. Record anti-replay hashes (proof_commitment + payment_id).
+	// O tax_nature_hash NÃO é registado: é natureza fiscal (igual por tipo de
+	// imposto), não identifica uma transação única.
+	if err := k.UsedDocumentHashes.Set(ctx, pc); err != nil {
+		return nil, fmt.Errorf("failed to record proof_commitment: %w", err)
+	}
+	if err := k.UsedPaymentIDs.Set(ctx, pid); err != nil {
+		return nil, fmt.Errorf("failed to record payment_id: %w", err)
+	}
+
+	// 15. Emit event
+	//
+	// `tax_entity_id` é o CNPJ/EIN/BN do GOVERNO que recebeu o imposto, derivado
+	// do slug assinado — é público por natureza e fica ao lado do valor. O do
+	// PAGADOR nunca aparece: só o seu hash (`payer_tax_id`).
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	attrs := []sdk.Attribute{
+		sdk.NewAttribute("miner", msg.MinerAddress),
+		sdk.NewAttribute("payment_amount", msg.PaymentAmount.String()),
+		sdk.NewAttribute("tax_entity", msg.TaxEntity),
+	}
+	if ids := types.TaxEntityIDs(msg.TaxEntity); len(ids) > 0 {
+		attrs = append(attrs, sdk.NewAttribute("tax_entity_id", strings.Join(ids, ",")))
+	}
+	attrs = append(attrs,
+		sdk.NewAttribute("currency_code", cc),
+		sdk.NewAttribute("proof_commitment", pc),
+		sdk.NewAttribute("tax_nature_hash", taxNatureHash),
+		sdk.NewAttribute("payment_id", pid),
+	)
+	attrs = append(attrs, miningSplitAttributes(split)...)
+	attrs = append(attrs,
+		sdk.NewAttribute("pool_active", fmt.Sprintf("%t", k.PoolOpen(ctx))),
+		sdk.NewAttribute("dao_active", fmt.Sprintf("%t", k.DAOActive(ctx))),
+	)
+	sdkCtx.EventManager().EmitEvent(sdk.NewEvent(types.EventTypeMine, attrs...))
+
+	return &types.MsgMineTaxPaymentResponse{
+		AmountMined:  split.Miner,
+		TaxRoot:      split.Founder,
+		TaxStaking:   split.Staking,
+		TaxValidator: split.Pool,
+	}, nil
+}
