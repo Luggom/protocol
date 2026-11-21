@@ -31,8 +31,9 @@ var protectedParamsFields = map[string]bool{
 
 // allowedOperationalFields: params que PODEM mudar por MsgUpdateParams
 // (governança; threshold 50% normal, 66,7% no caminho expedited).
+// A tax_entity_whitelist NÃO está aqui: só muda por AddTaxEntity/RemoveTaxEntity,
+// que o tally classifica a 67%. O guard do msg_server também a recusa.
 var allowedOperationalFields = map[string]bool{
-	"tax_entity_whitelist":        true,
 	"government_entity_blacklist": true,
 	"bank_providers":              true,
 	"pool_assets":                 true,

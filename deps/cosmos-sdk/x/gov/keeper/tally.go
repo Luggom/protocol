@@ -201,6 +201,12 @@ func (k Keeper) Tally(ctx context.Context, proposal v1.Proposal) (passes, burnDe
 
 	threshold, _ := math.LegacyNewDecFromStr(thresholdStr)
 
+	// Luggom fork: matérias sensíveis exigem supermaioria própria.
+	// Whitelist de mineração = 67%; custódia do BTC do OTC = 87%.
+	if extra := LuggomProposalExtraThreshold(proposal); extra.GT(threshold) {
+		threshold = extra
+	}
+
 	if results[v1.OptionYes].Quo(totalVotingPower.Sub(results[v1.OptionAbstain])).GT(threshold) {
 		return true, false, tallyResults, nil
 	}

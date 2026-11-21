@@ -19,7 +19,7 @@ func NewParams() Params {
 		FounderAddress:          "",
 		ApiVerifierAddress:      "",
 		UsdOracleUpdaterAddress: "",
-		// E — listas operacionais (governança; threshold 50% normal, 66,7% expedited).
+		// E — listas operacionais (whitelist 67%; restantes 50%).
 		PoolActive:                false,
 		TaxEntityWhitelist:        DefaultGlobalTaxEntities(),
 		GovernmentEntityBlacklist: DefaultGovernmentEntities(),
@@ -73,8 +73,7 @@ func (p Params) Validate() error {
 		return errors.New("gov_validator_min_for_weight_shift too large")
 	}
 
-	// E — listas operacionais (governança; threshold 50% normal, 66,7% no
-	// caminho expedited).
+	// E — listas operacionais (whitelist 67% via Add/Remove; restantes 50%).
 	if len(p.TaxEntityWhitelist) == 0 {
 		return errors.New("tax_entity_whitelist cannot be empty")
 	}

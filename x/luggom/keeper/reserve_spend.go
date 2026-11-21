@@ -28,17 +28,24 @@ const (
 	notarySpendWindowCapBps  = int64(2_500)
 )
 
-// SpendFromReserve gasta a tesouraria (gov) ou a reserva do notariado.
+// SpendFromReserve gasta a tesouraria (gov), a reserva do notariado ou move o
+// BTC retido no cofre OTC.
 //
 // Uma conta de módulo não tem chave e não pode assinar um `MsgSend`: sem esta
-// mensagem o saldo das duas reservas acumulava para sempre (§14). A authority é
-// o x/gov — é o único caminho de saída.
+// mensagem o saldo das reservas acumulava para sempre (§14). A authority é o
+// x/gov — é o único caminho de saída.
 //
 // A tesouraria é discricionária (qualquer destino). A reserva do notariado NÃO:
 // o destino tem de constar em `params.notary_payees`, ter entrado há pelo menos
 // 7 dias, e cada janela de 7 dias gasta no máximo 25% do saldo. É isso que
 // mantém a promessa documentada no whitepaper — a governança muda QUEM é
 // elegível para atestar, não PARA ONDE vai o orçamento.
+//
+// O reserve "otc" move o BTC/IBC retido (params.otc_btc_denom) do cofre OTC para
+// um novo endereço de custódia. O tally do x/gov exige 87% de aprovação para
+// propostas que contenham esta reserva — o BTC é o património do protocolo e só
+// muda de carteira com supermaioria. O LUG do cofre NÃO é tocado aqui; ele só
+// sai pelo BuyOtc, contra entrada de BTC.
 func (k msgServer) SpendFromReserve(ctx context.Context, msg *types.MsgSpendFromReserve) (*types.MsgSpendFromReserveResponse, error) {
 	if err := k.authorityOk(ctx, msg.Authority); err != nil {
 		return nil, err
@@ -61,9 +68,47 @@ func (k msgServer) SpendFromReserve(ctx context.Context, msg *types.MsgSpendFrom
 	now := sdkCtx.BlockTime().Unix()
 
 	var module string
+	var coinDenom = "uluggom"
+	var otcVault types.OtcVault
+	var otcDenom string
+	var otcSpend bool
 	switch msg.Reserve {
 	case types.ReserveGov:
 		module = types.GovReserveModuleName
+
+	case types.ReserveOtc:
+		module = types.OtcVaultModuleName
+		params, err := k.Params.Get(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read params: %w", err)
+		}
+		otcDenom = params.OtcBtcDenom
+		if otcDenom == "" {
+			return nil, fmt.Errorf("otc_btc_denom is not configured: cannot move the OTC collateral")
+		}
+		vault, err := k.OtcVault.Get(ctx)
+		if err != nil {
+			if errors.Is(err, collections.ErrNotFound) {
+				return nil, fmt.Errorf("OTC vault is empty: nothing to move")
+			}
+			return nil, fmt.Errorf("failed to read OTC vault: %w", err)
+		}
+		retained := sdkmath.ZeroInt()
+		for _, asset := range vault.RetainedAssets {
+			if asset.Denom == otcDenom {
+				retained = asset.Amount
+				break
+			}
+		}
+		if retained.IsNil() || retained.IsZero() {
+			return nil, fmt.Errorf("OTC vault has no retained %s", otcDenom)
+		}
+		if msg.Amount.GT(retained) {
+			return nil, fmt.Errorf("amount %s exceeds the retained %s %s", msg.Amount, retained, otcDenom)
+		}
+		otcVault = vault
+		otcSpend = true
+		coinDenom = otcDenom
 
 	case types.ReserveNotary:
 		module = types.NotaryReserveModuleName
@@ -107,7 +152,7 @@ func (k msgServer) SpendFromReserve(ctx context.Context, msg *types.MsgSpendFrom
 		}
 
 	default:
-		return nil, fmt.Errorf("unknown reserve %q (want %q or %q)", msg.Reserve, types.ReserveGov, types.ReserveNotary)
+		return nil, fmt.Errorf("unknown reserve %q (want %q, %q or %q)", msg.Reserve, types.ReserveGov, types.ReserveNotary, types.ReserveOtc)
 	}
 
 	// Tecto por janela, só na reserva do notariado. O saldo é lido da conta de
@@ -160,9 +205,27 @@ func (k msgServer) SpendFromReserve(ctx context.Context, msg *types.MsgSpendFrom
 		}
 	}
 
-	coins := sdk.NewCoins(sdk.NewCoin("uluggom", msg.Amount))
+	coins := sdk.NewCoins(sdk.NewCoin(coinDenom, msg.Amount))
 	if err := k.bankKeeper.SendCoinsFromModuleToAccount(ctx, module, dest, coins); err != nil {
 		return nil, fmt.Errorf("failed to spend from the %s reserve: %w", msg.Reserve, err)
+	}
+
+	// O BTC saiu do cofre: retira do lastro contabilizado. Só o denom retido é
+	// tocado; o LUG acumulado (à venda) permanece no cofre.
+	if otcSpend {
+		for i := range otcVault.RetainedAssets {
+			if otcVault.RetainedAssets[i].Denom != otcDenom {
+				continue
+			}
+			otcVault.RetainedAssets[i].Amount = otcVault.RetainedAssets[i].Amount.Sub(msg.Amount)
+			if otcVault.RetainedAssets[i].Amount.IsZero() {
+				otcVault.RetainedAssets = append(otcVault.RetainedAssets[:i], otcVault.RetainedAssets[i+1:]...)
+			}
+			break
+		}
+		if err := k.OtcVault.Set(ctx, otcVault); err != nil {
+			return nil, fmt.Errorf("failed to update the OTC vault: %w", err)
+		}
 	}
 
 	if msg.Reserve == types.ReserveNotary {
@@ -177,6 +240,7 @@ func (k msgServer) SpendFromReserve(ctx context.Context, msg *types.MsgSpendFrom
 	sdkCtx.EventManager().EmitEvent(sdk.NewEvent(types.EventTypeReserveSpend,
 		sdk.NewAttribute("reserve", msg.Reserve),
 		sdk.NewAttribute("reserve_module", module),
+		sdk.NewAttribute("denom", coinDenom),
 		sdk.NewAttribute("destination", msg.Destination),
 		sdk.NewAttribute("amount", msg.Amount.String()),
 	))

@@ -408,7 +408,7 @@ service Msg {
 }
 
 // MsgAddTaxEntity adds a tax entity slug to the whitelist (operational list).
-// Only the module authority (x/gov; 50% threshold, 66.7% expedited) may submit.
+// Only the module authority (x/gov; 67% threshold for whitelist changes) may submit.
 message MsgAddTaxEntity {
   option (amino.name) = "luggom/x/luggom/MsgAddTaxEntity";
   option (cosmos.msg.v1.signer) = "authority";

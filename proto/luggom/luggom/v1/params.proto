@@ -51,14 +51,14 @@ message Params {
   // (chave quente). ROTÁVEL — o impacto é limitado pela mediana + fail-closed.
   string usd_oracle_updater_address = 13 [(cosmos_proto.scalar) = "cosmos.AddressString"];
 
-  // --- E: a "decoração" (governável; threshold 50%) ---
+  // --- E: a "decoração" (governável; whitelist 67%, restantes 50%) ---
 
   // pool_active: quando true, a pool (AMM) abre para AddLiquidity/Swap.
   // O protocolo não tem dotação de POOL.
   bool pool_active = 6;
 
   // tax_entity_whitelist: whitelist global unificada (slugs EUA + entes "br:")
-  // para a mineração. Operacional — threshold 50% (66,7% no expedited).
+  // para a mineração. Operacional — whitelist 67% (tally do x/gov).
   repeated string tax_entity_whitelist = 20;
 
   // government_entity_blacklist: tax-IDs de GOVERNOS que não podem minerar

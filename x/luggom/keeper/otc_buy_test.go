@@ -70,6 +70,31 @@ func TestBuyOtc_PaysBasketInBtcAndMovesLug(t *testing.T) {
 	require.Equal(t, buyLug.String(), sentToAmount(f.bank, buyerAddr).String())
 }
 
+// Sem entrada de BTC não sai LUG: a primeira transferência falha e a segunda
+// (LUG do cofre → comprador) nunca é executada.
+func TestBuyOtc_NoBtcNoLug(t *testing.T) {
+	f, vaultLug, buyer := otcBuyFixture(t)
+	f.bank.failSendFrom = map[string]bool{buyer: true}
+
+	lug := mustInt(t, "100000000000000000000000") // 100k LUG
+	_, err := f.keeper.BuyOtc(f.ctx, &types.MsgBuyOtc{
+		Buyer:     buyer,
+		LugAmount: lug,
+		BtcDenom:  "ibc/BTC",
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "failed to send BTC")
+
+	buyerAddr, err := f.addressCodec.StringToBytes(buyer)
+	require.NoError(t, err)
+	require.True(t, sentToAmount(f.bank, buyerAddr).IsZero(), "sem BTC, o LUG não pode sair")
+
+	got, err := f.keeper.OtcVault.Get(f.ctx)
+	require.NoError(t, err)
+	require.Equal(t, vaultLug.String(), got.AccumulatedLug.String())
+	require.Empty(t, got.RetainedAssets)
+}
+
 func TestBuyOtc_RejectsBelowLot(t *testing.T) {
 	f, _, buyer := otcBuyFixture(t)
 	below := types.MinOtcLotLug().SubRaw(1)

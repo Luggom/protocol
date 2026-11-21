@@ -1110,7 +1110,7 @@ func (m *MsgBuyOtcResponse) XXX_DiscardUnknown() {
 var xxx_messageInfo_MsgBuyOtcResponse proto.InternalMessageInfo
 
 // MsgAddTaxEntity adds a tax entity slug to the whitelist (operational list).
-// Only the module authority (x/gov; 50% threshold, 66.7% expedited) may submit.
+// Only the module authority (x/gov; 67% threshold for whitelist changes) may submit.
 type MsgAddTaxEntity struct {
 	Authority string `protobuf:"bytes,1,opt,name=authority,proto3" json:"authority,omitempty"`
 	// entity is the whitelist slug (e.g. "br:iptu_sao_paulo", "us:county:cook_il", "ca:city:toronto").

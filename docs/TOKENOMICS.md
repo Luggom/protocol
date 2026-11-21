@@ -84,6 +84,9 @@
   votar directamente.
 - **Quórum 20% · threshold 50% · veto 33%**; **expedited 66,7%** — parâmetros de
   genesis, alteráveis por proposta DAO (não são constantes de código).
+- **Whitelist de mineração:** 67% (MsgAddTaxEntity/MsgRemoveTaxEntity).
+  **Custódia do BTC do OTC:** 87% (MsgSpendFromReserve com `reserve="otc"`).
+  Os dois limiares são aplicados pelo tally do x/gov, não pelo threshold global.
 - **`min_deposit` 1.000 LUG + 10% inicial**; votação **5 dias**; depósito **3 dias** —
   também parâmetros de genesis.
 - **Sem tecto de voto para a LBC** (ver a secção LBC): é um participante, não uma

@@ -49,9 +49,11 @@ const (
 
 	// Nomes aceites em MsgSpendFromReserve. "gov" é a tesouraria (discricionária,
 	// só por voto); "notary" é a reserva do notariado (destino limitado a
-	// params.notary_payees).
+	// params.notary_payees); "otc" move o BTC retido no cofre OTC para outra
+	// custódia (87% de governança, aplicado pelo tally do x/gov).
 	ReserveGov    = "gov"
 	ReserveNotary = "notary"
+	ReserveOtc    = "otc"
 
 	// OtcVaultModuleName is the OTC LOCKED vault (§13.132). It receives 40% of
 	// each mint (no cap) while mining exists. The LUG is sold for BTC

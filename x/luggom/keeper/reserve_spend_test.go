@@ -22,6 +22,68 @@ func govAuthority(t *testing.T, f *mineFixture) string {
 	return s
 }
 
+// O BTC do OTC é património do protocolo: só muda de carteira com 87% de
+// governança. O tally classifica o reserve "otc" a 0.87; aqui testamos o
+// movimento em si (só o denom retido, nunca o LUG à venda).
+func TestSpendFromReserve_OtcMovesOnlyRetainedBtc(t *testing.T) {
+	f := initMineFixture(t)
+	ms := keeper.NewMsgServerImpl(f.keeper)
+
+	params := devParamsForTest()
+	params.OtcBtcDenom = "ibc/BTC"
+	require.NoError(t, f.keeper.Params.Set(f.ctx, params))
+
+	require.NoError(t, f.keeper.OtcVault.Set(f.ctx, types.OtcVault{
+		AccumulatedLug: sdkmath.NewInt(123),
+		RetainedAssets: []types.OtcRetainedAsset{
+			{Denom: "ibc/BTC", Amount: sdkmath.NewInt(1_000_000)},
+		},
+	}))
+
+	dest, _ := makeAddr(t, f.addressCodec, 0x46)
+	_, err := ms.SpendFromReserve(f.ctx, &types.MsgSpendFromReserve{
+		Authority:   govAuthority(t, f),
+		Reserve:     types.ReserveOtc,
+		Destination: dest,
+		Amount:      sdkmath.NewInt(400_000),
+	})
+	require.NoError(t, err)
+
+	require.Len(t, f.bank.sends, 1)
+	require.Equal(t, types.OtcVaultModuleName, f.bank.sends[0].module)
+	require.Equal(t, dest, f.bank.sends[0].to.String())
+	require.Equal(t, "ibc/BTC", f.bank.sends[0].coins[0].Denom)
+	require.Equal(t, "400000", f.bank.sends[0].coins[0].Amount.String())
+
+	got, err := f.keeper.OtcVault.Get(f.ctx)
+	require.NoError(t, err)
+	require.Len(t, got.RetainedAssets, 1)
+	require.Equal(t, "600000", got.RetainedAssets[0].Amount.String())
+	require.Equal(t, "123", got.AccumulatedLug.String(), "o LUG à venda não pode sair neste caminho")
+
+	// Acima do retido → recusa.
+	_, err = ms.SpendFromReserve(f.ctx, &types.MsgSpendFromReserve{
+		Authority:   govAuthority(t, f),
+		Reserve:     types.ReserveOtc,
+		Destination: dest,
+		Amount:      sdkmath.NewInt(700_000),
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "exceeds the retained")
+
+	// Sem o denom retido → recusa.
+	params.OtcBtcDenom = "ibc/PAXG"
+	require.NoError(t, f.keeper.Params.Set(f.ctx, params))
+	_, err = ms.SpendFromReserve(f.ctx, &types.MsgSpendFromReserve{
+		Authority:   govAuthority(t, f),
+		Reserve:     types.ReserveOtc,
+		Destination: dest,
+		Amount:      sdkmath.NewInt(1),
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "no retained")
+}
+
 // Só a authority (x/gov) pode gastar as reservas: uma conta de módulo não tem
 // chave, e é esta mensagem que impede o dinheiro de ficar preso para sempre.
 func TestSpendFromReserve_AuthorityOnly(t *testing.T) {

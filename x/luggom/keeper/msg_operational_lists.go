@@ -13,7 +13,7 @@ import (
 
 // msg_operational_lists.go — FASE 5 (governança/imutabilidade, §13.42).
 // Handlers para editar LISTAS OPERACIONAIS (entidades fiscais, bancos TLSNotary,
-// ativos da pool) via governança on-chain (authority = x/gov; threshold 50%, 66,7% no expedited).
+// ativos da pool) via governança on-chain (authority = x/gov; whitelist 67%, restantes listas 50%).
 // NUNCA tokenomics — o filtro estrito (ante-handler) rejeita mudanças de splits/cesta/teto.
 
 func (k msgServer) authorityOk(ctx context.Context, authority string) error {

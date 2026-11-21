@@ -2,6 +2,7 @@ package keeper
 
 import (
 	"fmt"
+	"slices"
 
 	"luggom/x/luggom/types"
 )
@@ -21,8 +22,13 @@ import (
 // Deliberadamente NÃO bloqueados aqui:
 //   - `api_verifier_address`, `usd_oracle_updater_address` — Grupo C: chaves
 //     que TÊM de rodar (§13.121; o notário evolui para t-de-n);
-//   - `tax_entity_whitelist`, `government_entity_blacklist`, `bank_providers`,
-//     `pool_assets`, `pool_active` — Grupo E: listas operacionais (threshold 50%).
+//   - `government_entity_blacklist`, `bank_providers`, `pool_assets`,
+//     `pool_active` — Grupo E: listas operacionais (threshold 50%).
+//
+// A `tax_entity_whitelist` é a excepção: é matéria sensível de mineração e só
+// pode mudar por `MsgAddTaxEntity`/`MsgRemoveTaxEntity`, que o tally do x/gov
+// classifica a 67%. Um `MsgUpdateParams` com a lista alterada é recusado aqui
+// (o caminho embutido numa proposta de gov não passa pelo ante).
 func validateUpdateParamsProtected(current, next types.Params) error {
 	if next.FounderAddress != current.FounderAddress {
 		return fmt.Errorf("strict filter: founder_address is locked at genesis (§13.170 Grupo C) — refusing to change it")
@@ -32,6 +38,9 @@ func validateUpdateParamsProtected(current, next types.Params) error {
 		next.GovValidatorsVoteWeightBps != current.GovValidatorsVoteWeightBps ||
 		next.GovValidatorMinForWeightShift != current.GovValidatorMinForWeightShift {
 		return fmt.Errorf("strict filter: governance tally weights are protected — refusing to change them via UpdateParams")
+	}
+	if !slices.Equal(current.TaxEntityWhitelist, next.TaxEntityWhitelist) {
+		return fmt.Errorf("strict filter: tax_entity_whitelist must be changed via MsgAddTaxEntity/MsgRemoveTaxEntity (67%% governance) — MsgUpdateParams cannot touch it")
 	}
 	return nil
 }

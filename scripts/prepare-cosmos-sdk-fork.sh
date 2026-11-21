@@ -11,11 +11,15 @@ fi
 rm -rf "$DEST"
 cp -a "$SRC" "$DEST"
 TALLY="$DEST/x/gov/keeper/tally.go"
+# (a) export do tally default e (b) limiares Luggom no Tally:
+#     whitelist 67% / custódia OTC 87% (ver luggom_thresholds.go).
+patch -p1 -d "$DEST" < "$ROOT/cosmos_sdk_fork_patches/x/gov/keeper/tally.go.patch"
 if ! grep -q 'DefaultCalculateVoteResultsAndVotingPower = defaultCalculateVoteResultsAndVotingPower' "$TALLY"; then
   printf '\n// Luggom fork: export default tally for weighted governance wrapper.\nvar DefaultCalculateVoteResultsAndVotingPower = defaultCalculateVoteResultsAndVotingPower\n' >> "$TALLY"
 fi
 cp "$ROOT/cosmos_sdk_fork_patches/x/gov/keeper/luggom_bridge.go" "$DEST/x/gov/keeper/"
 cp "$ROOT/cosmos_sdk_fork_patches/x/gov/keeper/luggom_weighted_tally.go" "$DEST/x/gov/keeper/"
+cp "$ROOT/cosmos_sdk_fork_patches/x/gov/keeper/luggom_thresholds.go" "$DEST/x/gov/keeper/"
 # FASE 3: limite 1% stake por validador (patch staking).
 cp "$ROOT/cosmos_sdk_fork_patches/x/staking/keeper/luggom_stake_limit.go" "$DEST/x/staking/keeper/"
 cp "$ROOT/cosmos_sdk_fork_patches/x/staking/types/luggom_errors.go" "$DEST/x/staking/types/"

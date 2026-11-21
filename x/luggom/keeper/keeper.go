@@ -158,7 +158,7 @@ func (k Keeper) GetApiVerifierAddress(ctx context.Context) string {
 }
 
 // IsTaxEntityWhitelisted checks the on-chain TLSNotary whitelist.
-// Whitelist é governada por params on-chain — threshold 50% (66,7% no caminho expedited).
+// Whitelist é governada por params on-chain — 67% (aplicado pelo tally do x/gov).
 func (k Keeper) IsTaxEntityWhitelisted(ctx context.Context, entity string) (bool, error) {
 	params, err := k.Params.Get(ctx)
 	if err != nil {

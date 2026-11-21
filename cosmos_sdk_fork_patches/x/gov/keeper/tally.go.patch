@@ -1,0 +1,22 @@
+--- a/x/gov/keeper/tally.go
++++ b/x/gov/keeper/tally.go
+@@ -201,6 +201,12 @@
+ 
+ 	threshold, _ := math.LegacyNewDecFromStr(thresholdStr)
+ 
++	// Luggom fork: matérias sensíveis exigem supermaioria própria.
++	// Whitelist de mineração = 67%; custódia do BTC do OTC = 87%.
++	if extra := LuggomProposalExtraThreshold(proposal); extra.GT(threshold) {
++		threshold = extra
++	}
++
+ 	if results[v1.OptionYes].Quo(totalVotingPower.Sub(results[v1.OptionAbstain])).GT(threshold) {
+ 		return true, false, tallyResults, nil
+ 	}
+@@ -208,3 +214,6 @@
+ 	// If more than 1/2 of non-abstaining voters vote No, proposal fails
+ 	return false, false, tallyResults, nil
+ }
++
++// Luggom fork: export default tally for weighted governance wrapper.
++var DefaultCalculateVoteResultsAndVotingPower = defaultCalculateVoteResultsAndVotingPower

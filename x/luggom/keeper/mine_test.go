@@ -48,6 +48,9 @@ type trackingBankKeeper struct {
 	// failSendTo força a FALHA do envio para estes endereços — para testar que
 	// cada fatia da mineração é fail-closed (DV M1).
 	failSendTo map[string]bool
+	// failSendFrom força a FALHA do envio a partir destes endereços — para
+	// testar que sem BTC não sai LUG do cofre OTC.
+	failSendFrom map[string]bool
 }
 
 func (m *trackingBankKeeper) SpendableCoins(_ context.Context, addr sdk.AccAddress) sdk.Coins {
@@ -91,7 +94,10 @@ func (m *trackingBankKeeper) SendCoinsFromModuleToModule(_ context.Context, modu
 	return nil
 }
 
-func (m *trackingBankKeeper) SendCoinsFromAccountToModule(context.Context, sdk.AccAddress, string, sdk.Coins) error {
+func (m *trackingBankKeeper) SendCoinsFromAccountToModule(_ context.Context, from sdk.AccAddress, _ string, _ sdk.Coins) error {
+	if m.failSendFrom != nil && m.failSendFrom[from.String()] {
+		return fmt.Errorf("mock: envio forçado a falhar de %s", from)
+	}
 	return nil
 }
 

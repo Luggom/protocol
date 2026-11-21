@@ -98,6 +98,26 @@ func TestUpdateParams_RejectsFounderAddressChange(t *testing.T) {
 	require.Empty(t, got.FounderAddress, "os params não podem ter mudado")
 }
 
+func TestUpdateParams_RejectsWhitelistChange(t *testing.T) {
+	f := initFixture(t)
+	ms := keeper.NewMsgServerImpl(f.keeper)
+
+	authorityStr, err := f.addressCodec.BytesToString(f.keeper.GetAuthority())
+	require.NoError(t, err)
+	require.NoError(t, f.keeper.Params.Set(f.ctx, types.DefaultParams()))
+
+	next := types.DefaultParams()
+	next.TaxEntityWhitelist = append(next.TaxEntityWhitelist, "br:iptu_nova_cidade")
+
+	_, err = ms.UpdateParams(f.ctx, &types.MsgUpdateParams{Authority: authorityStr, Params: next})
+	require.Error(t, err, "whitelist é matéria sensível: só por AddTaxEntity/RemoveTaxEntity (67%)")
+	require.Contains(t, err.Error(), "tax_entity_whitelist must be changed via MsgAddTaxEntity/MsgRemoveTaxEntity")
+
+	got, err := f.keeper.Params.Get(f.ctx)
+	require.NoError(t, err)
+	require.NotContains(t, got.TaxEntityWhitelist, "br:iptu_nova_cidade")
+}
+
 func TestUpdateParams_AllowsOperationalListsAndKeyRotation(t *testing.T) {
 	f := initFixture(t)
 	ms := keeper.NewMsgServerImpl(f.keeper)
