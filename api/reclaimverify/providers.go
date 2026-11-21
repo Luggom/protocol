@@ -19,7 +19,7 @@ type ProviderInfo struct {
 
 // KnownProviders returns the list of known banking providers for TLSNotary proof generation.
 // Fase 1: fixed list. Future: dynamic registry via Reclaim Protocol / on-chain governance
-// (§13.23: whitelist de bancos on-chain governável 67% — MsgAddBankProvider/MsgRemoveBankProvider).
+// (§13.23: whitelist de bancos on-chain governável (threshold 50%) — MsgAddBankProvider/MsgRemoveBankProvider).
 func KnownProviders() []ProviderInfo {
 	return []ProviderInfo{
 		// EUA (§13.31 — centrar nos maiores bancos)

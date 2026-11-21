@@ -3,7 +3,7 @@ package types
 import "strings"
 
 // operational_lists.go — Defaults for governance-editable operational lists (FASE 5).
-// These are params editable by 67% governance (§13.42) — NEVER tokenomics.
+// These are params editable by governance (§13.42; 50% threshold, 66.7% expedited) — NEVER tokenomics.
 
 // DefaultBankProviders returns the default TLSNotary bank provider IDs (on-chain
 // whitelist). Mirrors api/reclaimverify/providers.go — the supported banks
@@ -28,7 +28,7 @@ func DefaultPoolAssets() []string {
 }
 
 // IsBankProviderWhitelisted indica se o banco está na whitelist ON-CHAIN
-// (governável por 67%, §13.42). Fail-closed: id vazio ou lista sem ele ⇒ false.
+// (governável, §13.42; threshold 50%). Fail-closed: id vazio ou lista sem ele ⇒ false.
 //
 // Existe porque a verificação tem de ser feita na CHAIN, não só na API: uma API
 // comprometida (ou um cliente que fale directamente com a chain) não pode

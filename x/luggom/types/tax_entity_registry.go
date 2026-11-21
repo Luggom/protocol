@@ -808,10 +808,36 @@ func IsTaxEntityWhitelisted(entity string, whitelist []string) bool {
 // IsBCASlug reports whether a tax-entity slug belongs to the BCA bloc
 // (Brasil/Canadá/EUA) — the only countries where mining is allowed (§13.22,
 // BCA imutável, sem 4º país). Used by governance to reject out-of-BCA additions.
+//
+// Além do prefixo, exige um sufixo não vazio e só [a-z0-9:_-], para que um
+// "br:" solto ou um slug com path/URL não passe como entidade fiscal.
 func IsBCASlug(entity string) bool {
 	e := strings.ToLower(strings.TrimSpace(entity))
 	if e == "irs" || e == "ca_ftb" || e == "ny_dtf" {
 		return true
 	}
-	return strings.HasPrefix(e, "br:") || strings.HasPrefix(e, "us:") || strings.HasPrefix(e, "ca:")
+	var rest string
+	switch {
+	case strings.HasPrefix(e, "br:"):
+		rest = e[3:]
+	case strings.HasPrefix(e, "us:"):
+		rest = e[3:]
+	case strings.HasPrefix(e, "ca:"):
+		rest = e[3:]
+	default:
+		return false
+	}
+	if rest == "" {
+		return false
+	}
+	for _, c := range rest {
+		switch {
+		case c >= 'a' && c <= 'z':
+		case c >= '0' && c <= '9':
+		case c == '_' || c == ':' || c == '-':
+		default:
+			return false
+		}
+	}
+	return true
 }

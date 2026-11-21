@@ -197,7 +197,7 @@ python3 coletor-browser/verify_rail.py --banco <id>
 | # | File | What |
 |---|---|---|
 | 1 | `api/reclaimverify/providers.go` (`KnownProviders`) | `{ID, Name, Country, Domain}`. **Without `Domain`, the host check is fail-closed** |
-| 2 | `x/luggom/types/operational_lists.go` (`DefaultBankProviders`) | the ID in the **on-chain** whitelist (gov 67%). **Without it, `/mine/tax` returns 403/1208** |
+| 2 | `x/luggom/types/operational_lists.go` (`DefaultBankProviders`) | the ID in the **on-chain** whitelist (gov, 50% threshold (expedited 66.7%)). **Without it, `/mine/tax` returns 403/1208** |
 | 3 | `api/taxnature/taxnature.go` (`Country`) | the ID in the country `switch`. **Without it, `VerifyTlsnProof` aborts** |
 | 4 | `coletor-browser/make_prover_request_<bank>.py` | the **request builder** (template: **Caixa** if cookie-only; **Viacredi** if ECDSA/RSA signature) |
 | 5 | `coletor-browser/manifest.json` | the domain in `host_permissions` **and** `content_scripts.matches` |

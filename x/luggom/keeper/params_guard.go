@@ -22,7 +22,7 @@ import (
 //   - `api_verifier_address`, `usd_oracle_updater_address` — Grupo C: chaves
 //     que TÊM de rodar (§13.121; o notário evolui para t-de-n);
 //   - `tax_entity_whitelist`, `government_entity_blacklist`, `bank_providers`,
-//     `pool_assets`, `pool_active` — Grupo E: listas operacionais a 67%.
+//     `pool_assets`, `pool_active` — Grupo E: listas operacionais (threshold 50%).
 func validateUpdateParamsProtected(current, next types.Params) error {
 	if next.FounderAddress != current.FounderAddress {
 		return fmt.Errorf("strict filter: founder_address is locked at genesis (§13.170 Grupo C) — refusing to change it")

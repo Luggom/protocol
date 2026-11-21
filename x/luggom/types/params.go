@@ -19,7 +19,7 @@ func NewParams() Params {
 		FounderAddress:          "",
 		ApiVerifierAddress:      "",
 		UsdOracleUpdaterAddress: "",
-		// E — listas operacionais (67% de governança).
+		// E — listas operacionais (governança; threshold 50% normal, 66,7% expedited).
 		PoolActive:                false,
 		TaxEntityWhitelist:        DefaultGlobalTaxEntities(),
 		GovernmentEntityBlacklist: DefaultGovernmentEntities(),
@@ -73,9 +73,32 @@ func (p Params) Validate() error {
 		return errors.New("gov_validator_min_for_weight_shift too large")
 	}
 
-	// E — listas operacionais.
+	// E — listas operacionais (governança; threshold 50% normal, 66,7% no
+	// caminho expedited).
 	if len(p.TaxEntityWhitelist) == 0 {
 		return errors.New("tax_entity_whitelist cannot be empty")
+	}
+	seenEntity := make(map[string]struct{}, len(p.TaxEntityWhitelist))
+	for i, entity := range p.TaxEntityWhitelist {
+		if entity == "" {
+			return fmt.Errorf("tax_entity_whitelist[%d] cannot be empty", i)
+		}
+		if strings.TrimSpace(entity) != entity {
+			return fmt.Errorf("tax_entity_whitelist[%d] has leading or trailing whitespace: %q", i, entity)
+		}
+		if strings.ToLower(entity) != entity {
+			return fmt.Errorf("tax_entity_whitelist[%d] must be lowercase canonical: %q", i, entity)
+		}
+		// BCA imutável (§13.22): a lista só pode conter slugs br:/us:/ca:.
+		// Sem esta validação, um MsgUpdateParams contornava o IsBCASlug que o
+		// MsgAddTaxEntity aplica e a promessa "sem 4.º país" deixava de valer.
+		if !IsBCASlug(entity) {
+			return fmt.Errorf("tax_entity_whitelist[%d] is not a valid BCA slug (br:/us:/ca:): %q", i, entity)
+		}
+		if _, dup := seenEntity[entity]; dup {
+			return fmt.Errorf("tax_entity_whitelist[%d] is duplicated: %s", i, entity)
+		}
+		seenEntity[entity] = struct{}{}
 	}
 	for i, id := range p.GovernmentEntityBlacklist {
 		raw := strings.TrimSpace(id)

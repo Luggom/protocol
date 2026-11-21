@@ -29,7 +29,8 @@ var protectedParamsFields = map[string]bool{
 	"gov_validators_vote_weight_bps":     true,
 }
 
-// allowedOperationalFields: params que PODEM mudar por MsgUpdateParams (67%).
+// allowedOperationalFields: params que PODEM mudar por MsgUpdateParams
+// (governança; threshold 50% normal, 66,7% no caminho expedited).
 var allowedOperationalFields = map[string]bool{
 	"tax_entity_whitelist":        true,
 	"government_entity_blacklist": true,

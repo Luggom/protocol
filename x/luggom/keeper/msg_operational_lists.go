@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strings"
 
 	errorsmod "cosmossdk.io/errors"
 
@@ -12,7 +13,7 @@ import (
 
 // msg_operational_lists.go — FASE 5 (governança/imutabilidade, §13.42).
 // Handlers para editar LISTAS OPERACIONAIS (entidades fiscais, bancos TLSNotary,
-// ativos da pool) via governança on-chain 67% (authority = x/gov).
+// ativos da pool) via governança on-chain (authority = x/gov; threshold 50%, 66,7% no expedited).
 // NUNCA tokenomics — o filtro estrito (ante-handler) rejeita mudanças de splits/cesta/teto.
 
 func (k msgServer) authorityOk(ctx context.Context, authority string) error {
@@ -55,7 +56,10 @@ func (k msgServer) AddTaxEntity(ctx context.Context, msg *types.MsgAddTaxEntity)
 	if err := k.authorityOk(ctx, msg.Authority); err != nil {
 		return nil, err
 	}
-	if msg.Entity == "" {
+	// Forma canónica (minúsculas, sem espaços): sem isto, "BR:X" entrava na
+	// lista mas nunca casava com um tax_entity minúsculo vindo da atestação.
+	entity := strings.ToLower(strings.TrimSpace(msg.Entity))
+	if entity == "" {
 		return nil, fmt.Errorf("entity cannot be empty")
 	}
 	params, err := k.Params.Get(ctx)
@@ -63,10 +67,10 @@ func (k msgServer) AddTaxEntity(ctx context.Context, msg *types.MsgAddTaxEntity)
 		return nil, err
 	}
 	// BCA imutável (§13.22): só entidades DENTRO dos 3 países (validação de slug).
-	if !types.IsBCASlug(msg.Entity) {
-		return nil, fmt.Errorf("entity %q is not a valid BCA slug (br:/us:/ca:)", msg.Entity)
+	if !types.IsBCASlug(entity) {
+		return nil, fmt.Errorf("entity %q is not a valid BCA slug (br:/us:/ca:)", entity)
 	}
-	list, added := k.addToList(ctx, params.TaxEntityWhitelist, msg.Entity)
+	list, added := k.addToList(ctx, params.TaxEntityWhitelist, entity)
 	if !added {
 		return &types.MsgAddTaxEntityResponse{}, nil
 	}
@@ -84,11 +88,12 @@ func (k msgServer) RemoveTaxEntity(ctx context.Context, msg *types.MsgRemoveTaxE
 	if err := k.authorityOk(ctx, msg.Authority); err != nil {
 		return nil, err
 	}
+	entity := strings.ToLower(strings.TrimSpace(msg.Entity))
 	params, err := k.Params.Get(ctx)
 	if err != nil {
 		return nil, err
 	}
-	list, removed := k.removeFromList(ctx, params.TaxEntityWhitelist, msg.Entity)
+	list, removed := k.removeFromList(ctx, params.TaxEntityWhitelist, entity)
 	if !removed {
 		return &types.MsgRemoveTaxEntityResponse{}, nil
 	}

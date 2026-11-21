@@ -37,7 +37,7 @@ func (k Keeper) poolOpen(ctx context.Context) bool {
 }
 
 // isPoolAsset reports whether denom is whitelisted in params.PoolAssets.
-// The whitelist is a governance parameter (67%); adding an asset there must be
+// The whitelist is a governance parameter (50% threshold); adding an asset there must be
 // enough for the pool to accept it — no binary upgrade.
 func (k Keeper) isPoolAsset(ctx context.Context, denom string) bool {
 	params, err := k.Params.Get(ctx)

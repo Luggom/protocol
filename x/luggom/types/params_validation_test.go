@@ -64,6 +64,62 @@ func TestParamsValidate_PoolAssets(t *testing.T) {
 	}
 }
 
+func TestParamsValidate_TaxEntityWhitelist(t *testing.T) {
+	cases := []struct {
+		name    string
+		list    []string
+		wantErr bool
+	}{
+		{"default", DefaultGlobalTaxEntities(), false},
+		{"empty", nil, true},
+		{"out of BCA", []string{"de:finanzamt"}, true},
+		{"bare prefix", []string{"br:"}, true},
+		{"uppercase", []string{"BR:IPTU_X"}, true},
+		{"whitespace", []string{" br:iptu_x"}, true},
+		{"duplicate", []string{"br:iptu_x", "br:iptu_x"}, true},
+		{"path in slug", []string{"br:iptu_x/../y"}, true},
+		{"valid mixed", []string{"br:iptu_x", "us:county:cook_il", "ca:city:toronto", "irs"}, false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			params := DefaultParams()
+			params.TaxEntityWhitelist = tc.list
+			err := params.Validate()
+			if tc.wantErr && err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+			if !tc.wantErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestIsBCASlug(t *testing.T) {
+	cases := map[string]bool{
+		"irs":                  true,
+		"ca_ftb":               true,
+		"ny_dtf":               true,
+		"br:iptu_sao_paulo":    true,
+		"us:county:cook_il":    true,
+		"ca:city:toronto":      true,
+		"":                     false,
+		"br:":                  false,
+		"us:":                  false,
+		"de:finanzamt":         false,
+		"br:iptu_x/../y":       false,
+		"br:iptu x":            false,
+		"br:iptu_x?redirect=1": false,
+	}
+
+	for slug, want := range cases {
+		if got := IsBCASlug(slug); got != want {
+			t.Errorf("IsBCASlug(%q) = %v, want %v", slug, got, want)
+		}
+	}
+}
+
 func TestFrozenConstants(t *testing.T) {
 	if TlsnotaryPhaseFrozen != 2 {
 		t.Fatalf("tlsnotary_phase deve estar congelado em 2 (não há fase 1)")

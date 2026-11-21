@@ -36,7 +36,7 @@ const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 //	    alcançar, que era o ponto: T-GOV-1 provou que o filtro estrito não
 //	    protegia params);
 //	D — derivados (deixaram de ser knobs);
-//	E — mantidos (listas operacionais governáveis a 67%).
+//	E — mantidos (listas operacionais; threshold 50%).
 //
 // Os números apagados ficam RESERVADOS — não se reutilizam.
 type Params struct {
@@ -55,17 +55,17 @@ type Params struct {
 	// O protocolo não tem dotação de POOL.
 	PoolActive bool `protobuf:"varint,6,opt,name=pool_active,json=poolActive,proto3" json:"pool_active,omitempty"`
 	// tax_entity_whitelist: whitelist global unificada (slugs EUA + entes "br:")
-	// para a mineração. Operacional — 67% de governança.
+	// para a mineração. Operacional — threshold 50% (66,7% no expedited).
 	TaxEntityWhitelist []string `protobuf:"bytes,20,rep,name=tax_entity_whitelist,json=taxEntityWhitelist,proto3" json:"tax_entity_whitelist,omitempty"`
 	// government_entity_blacklist: tax-IDs de GOVERNOS que não podem minerar
-	// (government→government bloqueado). Operacional — 67% de governança.
+	// (government→government bloqueado). Operacional — threshold 50% (66,7% no expedited).
 	// Formato: "br:<14 dígitos>", "us:<9 dígitos>", "ca:<9 dígitos>".
 	GovernmentEntityBlacklist []string `protobuf:"bytes,31,rep,name=government_entity_blacklist,json=governmentEntityBlacklist,proto3" json:"government_entity_blacklist,omitempty"`
 	// bank_providers: whitelist de bancos (IDs de api/reclaimverify/providers.go).
-	// Operacional — 67% de governança.
+	// Operacional — threshold 50% (66,7% no expedited).
 	BankProviders []string `protobuf:"bytes,32,rep,name=bank_providers,json=bankProviders,proto3" json:"bank_providers,omitempty"`
 	// pool_assets: denoms permitidos na pool (btc, atom, usdt, usdc, xmr).
-	// Operacional — 67% de governança.
+	// Operacional — threshold 50% (66,7% no expedited).
 	PoolAssets []string `protobuf:"bytes,33,rep,name=pool_assets,json=poolAssets,proto3" json:"pool_assets,omitempty"`
 	// notary_payees: destinos PERMITIDOS para a reserva do notariado (0,5% de
 	// cada cunhagem). A governança muda QUEM recebe; não pode mandar o
@@ -73,7 +73,7 @@ type Params struct {
 	// (fail-closed). A tesouraria (1,5%) não usa esta lista: é discricionária.
 	NotaryPayees []string `protobuf:"bytes,34,rep,name=notary_payees,json=notaryPayees,proto3" json:"notary_payees,omitempty"`
 	// otc_btc_denom: denom IBC do BTC aceito no cofre OTC (ex.: "ibc/<HASH>").
-	// Operacional — 67% de governança.
+	// Operacional — threshold 50% (66,7% no expedited).
 	OtcBtcDenom string `protobuf:"bytes,35,opt,name=otc_btc_denom,json=otcBtcDenom,proto3" json:"otc_btc_denom,omitempty"`
 	// --- Pesos do tally da governança (GOVERNANCE_MVP15) — usados pelo x/gov ---
 	// gov_validator_min_for_weight_shift: legado; o tally atual não dilui pesos

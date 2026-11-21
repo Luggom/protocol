@@ -208,7 +208,7 @@ receber o campo**; o que falta é a evidência.
 | # | Onde | O que |
 |---|---|---|
 | 1 | `api/reclaimverify/providers.go` (`KnownProviders`) | `{ID, Name, Country, Domain}`. **Sem `Domain` o host check é fail-closed** |
-| 2 | `x/luggom/types/operational_lists.go` (`DefaultBankProviders`) | o ID na whitelist **on-chain** (gov 67%). **Sem isto, `/mine/tax` devolve 403/1208** |
+| 2 | `x/luggom/types/operational_lists.go` (`DefaultBankProviders`) | o ID na whitelist **on-chain** (gov, threshold 50%). **Sem isto, `/mine/tax` devolve 403/1208** |
 | 3 | `api/taxnature/taxnature.go` (`Country`) | o ID no `switch` do país. **Sem isto, `VerifyTlsnProof` aborta** |
 | 4 | `coletor-browser/make_prover_request_<banco>.py` | o **request builder** (molde: o da Caixa se for cookie-only; o da Viacredi se tiver assinatura) |
 | 5 | `coletor-browser/manifest.json` | o domínio em `host_permissions` **e** `content_scripts.matches` |

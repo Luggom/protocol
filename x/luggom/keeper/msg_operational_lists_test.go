@@ -50,6 +50,31 @@ func TestMsgAddRemoveTaxEntity(t *testing.T) {
 	require.Contains(t, err.Error(), "BCA")
 }
 
+func TestMsgAddRemoveTaxEntityCanonicalizes(t *testing.T) {
+	f := initFixture(t)
+	ms := keeper.NewMsgServerImpl(f.keeper)
+
+	params := types.DefaultParams()
+	require.NoError(t, f.keeper.Params.Set(f.ctx, params))
+
+	authorityStr, err := f.addressCodec.BytesToString(f.keeper.GetAuthority())
+	require.NoError(t, err)
+
+	// Entrada com maiúsculas/espaços é normalizada: senão entrava na lista mas
+	// nunca casava com o tax_entity minúsculo vindo da atestação.
+	_, err = ms.AddTaxEntity(f.ctx, &types.MsgAddTaxEntity{Authority: authorityStr, Entity: " BR:IPTU_NOVA_CIDADE "})
+	require.NoError(t, err)
+	got, err := f.keeper.Params.Get(f.ctx)
+	require.NoError(t, err)
+	require.True(t, types.IsTaxEntityWhitelisted("br:iptu_nova_cidade", got.TaxEntityWhitelist))
+	require.False(t, types.IsTaxEntityWhitelisted(" BR:IPTU_NOVA_CIDADE ", got.TaxEntityWhitelist))
+
+	_, err = ms.RemoveTaxEntity(f.ctx, &types.MsgRemoveTaxEntity{Authority: authorityStr, Entity: " BR:IPTU_NOVA_CIDADE "})
+	require.NoError(t, err)
+	got, _ = f.keeper.Params.Get(f.ctx)
+	require.False(t, types.IsTaxEntityWhitelisted("br:iptu_nova_cidade", got.TaxEntityWhitelist))
+}
+
 func TestMsgAddRemoveBankProvider(t *testing.T) {
 	f := initFixture(t)
 	ms := keeper.NewMsgServerImpl(f.keeper)

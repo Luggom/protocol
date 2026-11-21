@@ -45,7 +45,7 @@ func (k Keeper) MineTaxPayment(ctx context.Context, msg *types.MsgMineTaxPayment
 
 	// 1b. Block government-to-government mining (anti-inflation / anti-sybil, FASE 4-A..F)
 	// Two layers:
-	//   (1) payer_tax_id matches the on-chain government blacklist (params, gov-67% editable)
+	//   (1) payer_tax_id matches the on-chain government blacklist (params, gov-editable)
 	//   (2) fallback: payer_tax_id matches ANY tax entity in the whitelist (slug→ID map) —
 	//       covers every municipality/county/province in the whitelist without listing them all.
 	//

@@ -15,7 +15,7 @@ package types
 // tax whitelist — any payer whose ID matches a whitelisted tax entity is also blocked,
 // so small municipalities not listed here cannot mine either.
 //
-// On-chain: the default below is the genesis default; the live list is a gov-67%
+// On-chain: the default below is the genesis default; the live list is a gov-editable
 // governable param (government_entity_blacklist, §13.42).
 //
 // US states have NO single EIN — they are blocked by name in the extractor

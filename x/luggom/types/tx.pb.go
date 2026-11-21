@@ -1110,7 +1110,7 @@ func (m *MsgBuyOtcResponse) XXX_DiscardUnknown() {
 var xxx_messageInfo_MsgBuyOtcResponse proto.InternalMessageInfo
 
 // MsgAddTaxEntity adds a tax entity slug to the whitelist (operational list).
-// Only the module authority (x/gov, 67% governance) may submit.
+// Only the module authority (x/gov; 50% threshold, 66.7% expedited) may submit.
 type MsgAddTaxEntity struct {
 	Authority string `protobuf:"bytes,1,opt,name=authority,proto3" json:"authority,omitempty"`
 	// entity is the whitelist slug (e.g. "br:iptu_sao_paulo", "us:county:cook_il", "ca:city:toronto").
@@ -2695,7 +2695,7 @@ type MsgClient interface {
 	MineTaxPayment(ctx context.Context, in *MsgMineTaxPayment, opts ...grpc.CallOption) (*MsgMineTaxPaymentResponse, error)
 	LockSavings(ctx context.Context, in *MsgLockSavings, opts ...grpc.CallOption) (*MsgLockSavingsResponse, error)
 	UnlockSavings(ctx context.Context, in *MsgUnlockSavings, opts ...grpc.CallOption) (*MsgUnlockSavingsResponse, error)
-	// FASE 5 — governance of operational lists (67%, §13.42)
+	// FASE 5 — governance of operational lists (50% threshold, 66.7% expedited; §13.42)
 	AddTaxEntity(ctx context.Context, in *MsgAddTaxEntity, opts ...grpc.CallOption) (*MsgAddTaxEntityResponse, error)
 	RemoveTaxEntity(ctx context.Context, in *MsgRemoveTaxEntity, opts ...grpc.CallOption) (*MsgRemoveTaxEntityResponse, error)
 	AddBankProvider(ctx context.Context, in *MsgAddBankProvider, opts ...grpc.CallOption) (*MsgAddBankProviderResponse, error)
@@ -2941,7 +2941,7 @@ type MsgServer interface {
 	MineTaxPayment(context.Context, *MsgMineTaxPayment) (*MsgMineTaxPaymentResponse, error)
 	LockSavings(context.Context, *MsgLockSavings) (*MsgLockSavingsResponse, error)
 	UnlockSavings(context.Context, *MsgUnlockSavings) (*MsgUnlockSavingsResponse, error)
-	// FASE 5 — governance of operational lists (67%, §13.42)
+	// FASE 5 — governance of operational lists (50% threshold, 66.7% expedited; §13.42)
 	AddTaxEntity(context.Context, *MsgAddTaxEntity) (*MsgAddTaxEntityResponse, error)
 	RemoveTaxEntity(context.Context, *MsgRemoveTaxEntity) (*MsgRemoveTaxEntityResponse, error)
 	AddBankProvider(context.Context, *MsgAddBankProvider) (*MsgAddBankProviderResponse, error)

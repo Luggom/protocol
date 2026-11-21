@@ -12,7 +12,7 @@ import (
 
 // A whitelist de bancos vive em DOIS sítios:
 //   - off-chain: `reclaimverify.KnownProviders()` (ID + domínio, usado no host check)
-//   - on-chain:  `types.DefaultBankProviders()` (gov 67%, usado no portão do /mine/tax)
+//   - on-chain:  `types.DefaultBankProviders()` (gov, threshold 50%, usado no portão do /mine/tax)
 //
 // O comentário do segundo diz "mirrors" o primeiro, mas **nada o verifica** — a
 // cada banco novo há risco de deriva silenciosa: o banco é aceite numa camada e

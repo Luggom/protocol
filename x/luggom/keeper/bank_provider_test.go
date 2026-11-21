@@ -62,7 +62,7 @@ func TestMineTaxPayment_BankProviderNotWhitelisted(t *testing.T) {
 		msg := *base
 		msg.ProviderId = "viacredi"
 
-		// A governança (67%) remove o banco da lista…
+		// A governança (threshold 50%) remove o banco da lista…
 		p := types.DefaultParams()
 		kept := make([]string, 0, len(p.BankProviders))
 		for _, id := range p.BankProviders {
