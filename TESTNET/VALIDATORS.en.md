@@ -138,19 +138,22 @@ blocks and can be jailed (testnet slashing).
 
 ## Building from source
 
-The network runs the source at tag **`testnet-2026-10-27`** (commit `298b619`).
+The network runs the source equivalent to tag **`testnet-2026-11-19`**. The
+official binary was built from snapshot `7fa7dfc` of the previous repository;
+the public history was recreated, so your build's `commit` will be this tag's
+commit.
 Build with Go **1.23.8**, the version in `go.mod`:
 
 ```sh
-git clone --branch testnet-2026-10-27 --depth 1 https://github.com/Luggom/Luggom
-cd Luggom
+git clone --branch testnet-2026-11-19 --depth 1 https://github.com/Luggom/protocol
+cd protocol
 go version        # must be go1.23.8 (or a toolchain that honours go.mod)
 make install      # go install, with the version/commit ldflags
 luggomd version --long --output json
 ```
 
-The JSON must report `"version":"testnet-2026-10-27"` and `"commit":"298b619"`.
-If it does, your binary was built from exactly the source the network runs.
+The JSON must report `"version":"testnet-2026-11-19"`; the `commit` must match
+the commit of the `testnet-2026-11-19` tag in this repository.
 
 `make install` also passes `-checklinkname=0` (required by Go 1.23 with sonic).
 If you prefer to build by hand, reproduce the same ldflags:
@@ -159,8 +162,8 @@ If you prefer to build by hand, reproduce the same ldflags:
 go build -ldflags "-checklinkname=0 \
   -X github.com/cosmos/cosmos-sdk/version.Name=luggom \
   -X github.com/cosmos/cosmos-sdk/version.AppName=luggomd \
-  -X github.com/cosmos/cosmos-sdk/version.Version=testnet-2026-10-27 \
-  -X github.com/cosmos/cosmos-sdk/version.Commit=298b619" -o luggomd ./cmd/luggomd
+  -X github.com/cosmos/cosmos-sdk/version.Version=testnet-2026-11-19 \
+  -X github.com/cosmos/cosmos-sdk/version.Commit=7fa7dfc" -o luggomd ./cmd/luggomd
 ```
 
 The Cosmos SDK fork lives in `deps/cosmos-sdk` and is wired by a `replace` in

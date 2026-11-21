@@ -3,7 +3,7 @@
 This is the short checklist for the external validators (9 are in the final
 genesis; NODESYNC, Sr20de and BonyNode join later). The full reset guide
 is [RESET-2026-11-19.en.md](RESET-2026-11-19.en.md). Release:
-<https://github.com/Luggom/Luggom/releases/tag/testnet-2026-11-19>
+<https://github.com/Luggom/protocol/releases/tag/testnet-2026-11-19>
 
 ## 1. Verify the artifacts
 
